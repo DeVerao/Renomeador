@@ -63,31 +63,41 @@ def extrair_dados_comprovante(texto):
     nome = None
     identificador = None
     bloco_favorecido_match = re.search(
-        r"(?:TRANSFERIDO PARA:|quem recebeu:?|dados do recebedor)([\s\S]+?)(?=NR\. DOCUMENTO|Conta|NR\. AUTENTICACAO|Transação efetuada)",
+        r"(?:TRANSFERIDO PARA:?|quem recebeu:?|dados do recebedor:?)([\s\S]+?)(?=NR\. DOCUMENTO|NR\. AUTENTICACAO|Transação efetuada|Valor Transferido)",
         texto, re.IGNORECASE)
     texto_alvo = texto
     if bloco_favorecido_match:
         texto_alvo = bloco_favorecido_match.group(1)
+
+    NOME_CHARS = r"[A-ZÂÁÉÍÓÚÃÕÇ ]{4,}"
+
     padroes_nome = [
-        r"nome do recebedor:\s*([A-Za-zÂÁÉÍÓÚÃÕÇ ]+)",
-        r"BENEFICI[AÁ]RIO(?: final)?:?\s+([A-ZÂÁÉÍÓÚÃÕÇ ]+)",
-        r"(?:CLIENTE|Nome):?\s*([A-Za-zÂÁÉÍÓÚÃÕÇ ]+)",
-        r"favorecido:?\s*([A-Za-zÂÁÉÍÓÚÃÕÇ ]+)"
+        rf"^(?:Nome|Favorecido|Cliente|Benefici[aá]rio(?: final)?):?\s*\n\s*({NOME_CHARS})",#nome linha abaixo
+        rf"^({NOME_CHARS})\s*\n\s*(?:Nome|Favorecido):?",                                   #nome linha acima
+        rf"(?:Nome|Favorecido|Cliente|Benefici[aá]rio(?: final)?):?\s+({NOME_CHARS})"       #nome na mesma linha
+    ]
+
+    padroes_descricao = [
+        rf"(?:Descrição:\s*(?:\n\s*)?([^\n]+))", #descricao ao lado e abaixo
+        rf"(?:([^\n]+)\s*\n\s*Descrição:)",      #descricao acima
     ]
     for padrao in padroes_nome:
-        match_nome = re.search(padrao, texto_alvo, re.IGNORECASE)
+        match_nome = re.search(padrao, texto_alvo, re.IGNORECASE | re.MULTILINE)
         if match_nome:
             nome = match_nome.group(1).strip().upper()
+            nome = re.sub(r'\s*\n\s*', ' ', nome).strip()
             break
-    match_desc = re.search(r"Descrição:\s*(.*)", texto, re.IGNORECASE)
-    if match_desc:
-        desc_texto = match_desc.group(1).strip()
-        if desc_texto:
-            match_data_desc = re.search(r"(\d{2})[\s-](\d{2})$", desc_texto)
-            if match_data_desc:
-                mes, ano_curto = match_data_desc.groups()
-                data_formatada = f"{ano_curto}.{mes}"
-            identificador = desc_texto.split()[0].upper()
+    for padrao in padroes_descricao:
+        match_desc = re.search(padrao, texto, re.IGNORECASE)
+        if match_desc:
+            desc_texto = match_desc.group(1).strip()
+            if desc_texto:
+                match_data_desc = re.search(r"(\d{2})[\s-](\d{2})$", desc_texto)
+                if match_data_desc:
+                    mes, ano_curto = match_data_desc.groups()
+                    data_formatada = f"{ano_curto}.{mes}"
+                identificador = desc_texto.split()[0].upper()
+
     if not data_formatada:
         padrao_data_fallback = r"(?:Data de pagamento|data da transferência|DATA DA TRANSFERENCIA|DATA DO PAGAMENTO|Data da operação|Transferido em|efetuada em)?:?\s*(\d{2})[./](\d{2})[./](\d{4})"
         match_data = re.search(padrao_data_fallback, texto)
@@ -141,7 +151,7 @@ def excluir_duplicados(pasta, log_func):
 class PdfRenamerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Organizador de PDFs")
+        self.root.title("Renomeador")
         self.root.geometry("800x600")
         self.root.minsize(600, 400)
         self.folder_path = tk.StringVar()
@@ -234,11 +244,12 @@ class PdfRenamerApp:
             caminho_pdf = os.path.join(pasta, arquivo)
             try:
                 with fitz.open(caminho_pdf) as doc:
-                    texto_completo = ""
+                    paginas_texto = []
                     for page in doc:
-                        texto_pagina = page.get_text()
-                        if texto_pagina:
-                            texto_completo += texto_pagina + "\n"
+                        blocks = page.get_text("blocks", sort=True)
+                        paginas_texto.append("\n".join(b[4] for b in blocks if b[4].strip()))
+                    texto_completo = "\n".join(paginas_texto)
+                    print(texto_completo,"\n -=-=-=--=-=--=-==----==-=-=-=-=-=-=--==--=")
                 if not texto_completo.strip():
                     self.log_message(f"⚠ Aviso: Arquivo '{arquivo}' está vazio ou contém apenas imagens.")
                     continue
