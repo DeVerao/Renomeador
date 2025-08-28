@@ -72,9 +72,9 @@ def extrair_dados_comprovante(texto):
     NOME_CHARS = r"[A-ZÂÁÉÍÓÚÃÕÇ ]{4,}"
 
     padroes_nome = [
-        rf"^(?:Nome|Favorecido|Cliente|Benefici[aá]rio(?: final)?):?\s*\n\s*({NOME_CHARS})",#nome linha abaixo
-        rf"^({NOME_CHARS})\s*\n\s*(?:Nome|Favorecido):?",                                   #nome linha acima
-        rf"(?:Nome|Favorecido|Cliente|Benefici[aá]rio(?: final)?):?\s+({NOME_CHARS})"       #nome na mesma linha
+        rf"^(?:Nome|Favorecido|Cliente|Benefici[aá]rio(?: final)?):?\s*\n\s*({NOME_CHARS})",                  #nome linha abaixo
+        rf"^({NOME_CHARS})\s*\n\s*(?:Nome|Favorecido):?",                                                     #nome linha acima
+        rf"(?:Nome do Recebedor|Favorecido|Cliente|Nome|Benefici[aá]rio(?: final)?):?\s+({NOME_CHARS})"       #nome na mesma linha
     ]
 
     padroes_descricao = [
